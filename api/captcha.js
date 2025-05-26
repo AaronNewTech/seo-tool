@@ -1,20 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 import svgCaptcha from 'svg-captcha';
-import { setCaptcha } from '../lib/captcha-store.js';
+import redis from '../lib/redis.js';
 
-export default function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).end();
-  }
+export default async function handler(req, res) {
+  if (req.method !== 'GET') return res.status(405).end();
 
   const captcha = svgCaptcha.create();
   const id = uuidv4();
 
-  // Use the shared memory store so `captcha-image.js` can access it
-  setCaptcha(id, {
-    answer: captcha.text.toLowerCase(),
-    image: captcha.data,
-  });
+  await redis.setex(`captcha:${id}`, 600, captcha.text.toLowerCase()); // 10 min TTL
+  await redis.setex(`captcha-svg:${id}`, 600, captcha.data); // optional
 
   res.status(200).json({
     captcha_id: id,

@@ -1,13 +1,28 @@
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
+import redis from '../lib/redis.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).end();
   }
 
+  const { url, captcha_id, captcha_answer } = req.body;
+
+  // Validate CAPTCHA from Redis
+  const storedAnswer = await redis.get(`captcha:${captcha_id}`);
+
+  if (!storedAnswer || storedAnswer !== captcha_answer?.toLowerCase()) {
+    await redis.del(`captcha:${captcha_id}`);
+    await redis.del(`captcha-svg:${captcha_id}`);
+    return res.status(403).json({ error: 'Invalid CAPTCHA' });
+  }
+
+  // Clean up CAPTCHA after use
+  await redis.del(`captcha:${captcha_id}`);
+  await redis.del(`captcha-svg:${captcha_id}`);
+
   try {
-    const { url } = req.body;
     const start = Date.now();
 
     const response = await fetch(url, {
@@ -21,6 +36,7 @@ export default async function handler(req, res) {
     const load_time = (Date.now() - start) / 1000;
     const dom = new JSDOM(html);
     const doc = dom.window.document;
+
     const issues = [];
     const meta_tags = {};
 
@@ -35,7 +51,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Meta tags
     const metaElements = [...doc.querySelectorAll('meta')];
     for (const meta of metaElements) {
       const name = meta.getAttribute('name') || meta.getAttribute('property');
@@ -43,7 +58,6 @@ export default async function handler(req, res) {
       if (name && content) meta_tags[name.toLowerCase()] = content.trim();
     }
 
-    // Example issue
     if (!doc.querySelector('link[rel="canonical"]')) {
       issues.push({
         type: 'Missing Canonical Tag',
