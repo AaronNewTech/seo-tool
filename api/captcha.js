@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import svgCaptcha from 'svg-captcha';
+import { setCaptcha } from '../lib/captcha-store.js';
 
 const captchaStore = new Map();
 
@@ -16,7 +17,7 @@ export default function handler(req, res) {
     image: captcha.data,
   });
 
-  setTimeout(() => captchaStore.delete(id), 10 * 60 * 1000); // expire in 10 min
+  setTimeout(() => captchaStore.delete(id), 10 * 60 * 1000);
 
   res.status(200).json({
     captcha_id: id,
