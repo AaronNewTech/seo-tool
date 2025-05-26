@@ -7,10 +7,10 @@
     ],
     "builds": [
       {
-        "src": "api/**/*.js",
+        "src": "api/**/*.js"
       },
       {
-        "src": "frontend/package.json",
+        "src": "frontend/package.json"
         "config": {
           "distDir": "frontend/build"
         }
