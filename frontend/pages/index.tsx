@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
 
 interface AnalysisResult {
   url: string;
@@ -31,7 +30,7 @@ function App() {
         const res = await fetch('/api/captcha');
         const data = await res.json();
         setCaptchaId(data.captcha_id);
-        setCaptchaImageUrl(`/api${data.captcha_svg}`);
+        setCaptchaImageUrl(data.captcha_svg);
       } catch (err) {
         setError('Failed to load CAPTCHA');
       }
@@ -60,14 +59,14 @@ function App() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        setError(errorText || 'Failed to analyze URL');
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to analyze URL');
 
         // Reload CAPTCHA
         const newCaptcha = await fetch('/api/captcha');
         const newCaptchaData = await newCaptcha.json();
         setCaptchaId(newCaptchaData.captcha_id);
-        setCaptchaImageUrl(`/api${newCaptchaData.captcha_svg}`);
+        setCaptchaImageUrl(newCaptchaData.captcha_svg);
         return;
       }
 
@@ -91,7 +90,7 @@ function App() {
       const res = await fetch('/api/captcha');
       const data = await res.json();
       setCaptchaId(data.captcha_id);
-      setCaptchaImageUrl(`/api${data.captcha_svg}`);
+      setCaptchaImageUrl(data.captcha_svg);
     } catch {
       setError('Failed to reload CAPTCHA');
     }

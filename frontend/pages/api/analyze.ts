@@ -1,71 +1,28 @@
-import express from 'express';
-import cors from 'cors';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-import { v4 as uuidv4 } from 'uuid';
-import svgCaptcha from 'svg-captcha';
-import rateLimit from 'express-rate-limit';
+import redis from '../lib/redis'; // Adjust if needed
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.set('trust proxy', 1);
-const captchaStore = new Map();
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).end();
+  }
 
-
-// Allow max 5 requests per minute for CAPTCHA
-const captchaLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5,
-  message: 'Too many CAPTCHA requests from this IP, please try again later.',
-});
-
-// Allow max 10 analysis requests per 10 minutes
-const analyzeLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 10,
-  message: 'Too many analysis requests, please slow down.',
-});
-
-// Apply to routes
-app.use('/api/captcha', captchaLimiter);
-app.use('/api/analyze', analyzeLimiter);
-
-app.get('/api/captcha', (req, res) => {
-    const captcha = svgCaptcha.create(); // returns { data, text }
-    const id = uuidv4();
-  
-    captchaStore.set(id, {
-      answer: captcha.text.toLowerCase(),
-      image: captcha.data, // SVG XML
-    });
-  
-    setTimeout(() => captchaStore.delete(id), 10 * 60 * 1000); // 10 mins
-  
-    res.json({
-      captcha_id: id,
-      captcha_svg: `/captcha-image?id=${id}`,
-    });
-  });
-  
-  app.get('/api/captcha-image', (req, res) => {
-    const { id } = req.query;
-    const captcha = captchaStore.get(id);
-  
-    if (!captcha) return res.status(404).send('Not found');
-  
-    res.setHeader('Content-Type', 'image/svg+xml');
-    res.send(captcha.image);
-  });
-  
-  
-
-app.post('/api/analyze', async (req, res) => {
   const { url, captcha_id, captcha_answer } = req.body;
-  const storedAnswer = captchaStore.get(captcha_id);
 
-  if (!storedAnswer || storedAnswer.answer !== captcha_answer.toLowerCase())
-    captchaStore.delete(captcha_id);
+  const storedAnswer = await redis.get(`captcha:${captcha_id}`);
+
+  if (!storedAnswer || storedAnswer !== captcha_answer?.toLowerCase()) {
+    await redis.del(`captcha:${captcha_id}`);
+    await redis.del(`captcha-svg:${captcha_id}`);
+    return res.status(403).json({ error: 'Invalid CAPTCHA, please try again!' });
+  }
+
+  await redis.del(`captcha:${captcha_id}`);
+  await redis.del(`captcha-svg:${captcha_id}`);
 
   try {
     const start = Date.now();
@@ -75,12 +32,14 @@ app.post('/api/analyze', async (req, res) => {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/115.0.0.0',
       },
     });
+
     const html = await response.text();
     const load_time = (Date.now() - start) / 1000;
     const dom = new JSDOM(html);
     const doc = dom.window.document;
+
     const issues = [];
-    const meta_tags = {};
+    const meta_tags: Record<string, string> = {};
 
     const title =
       doc.querySelector('title')?.textContent?.trim() || 'No title found';
@@ -103,7 +62,7 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
-    const imgs = [...doc.querySelectorAll('img')];
+    const imgs = Array.from(doc.querySelectorAll('img'));
     if (imgs.some((img) => !img.alt)) {
       issues.push({
         type: 'Missing Alt Text',
@@ -138,7 +97,7 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
-    const metaElements = [...doc.querySelectorAll('meta')];
+    const metaElements = Array.from(doc.querySelectorAll('meta'));
     for (const meta of metaElements) {
       const name = meta.getAttribute('name') || meta.getAttribute('property');
       const content = meta.getAttribute('content');
@@ -148,14 +107,16 @@ app.post('/api/analyze', async (req, res) => {
     if (!doc.querySelector('link[rel="canonical"]')) {
       issues.push({
         type: 'Missing Canonical Tag',
-        description: 'The page has no canonical URL defined.',
+        description: 'No canonical tag found',
         severity: 'medium',
         recommendation:
           'Add a canonical link to avoid duplicate content issues.',
       });
     }
 
-    const robotsMeta = doc.querySelector('meta[name="robots"]');
+    const robotsMeta = doc.querySelector(
+      'meta[name="robots"]',
+    ) as HTMLMetaElement;
     if (robotsMeta && robotsMeta.content.toLowerCase().includes('noindex')) {
       issues.push({
         type: 'Noindex Tag Detected',
@@ -200,7 +161,7 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       url,
       title,
       load_time,
@@ -212,10 +173,4 @@ app.post('/api/analyze', async (req, res) => {
     console.error(err);
     res.status(500).json({ detail: 'Failed to analyze the URL.' });
   }
-});
-
-app.get('/', (req, res) => {
-  res.json({ message: 'SEO Analysis Tool API (Node.js)' });
-});
-
-app.listen(8000, () => console.log('Server running on http://localhost:8000'));
+}
