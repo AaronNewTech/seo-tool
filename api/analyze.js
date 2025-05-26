@@ -1,0 +1,68 @@
+import fetch from 'node-fetch';
+import { JSDOM } from 'jsdom';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).end();
+  }
+
+  try {
+    const { url } = req.body;
+    const start = Date.now();
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/115.0.0.0',
+      },
+    });
+
+    const html = await response.text();
+    const load_time = (Date.now() - start) / 1000;
+    const dom = new JSDOM(html);
+    const doc = dom.window.document;
+    const issues = [];
+    const meta_tags = {};
+
+    const title = doc.querySelector('title')?.textContent?.trim() || 'No title found';
+
+    if (!doc.querySelector('title')) {
+      issues.push({
+        type: 'Missing Title',
+        description: 'The page has no title tag',
+        severity: 'high',
+        recommendation: 'Add a descriptive title tag',
+      });
+    }
+
+    // Meta tags
+    const metaElements = [...doc.querySelectorAll('meta')];
+    for (const meta of metaElements) {
+      const name = meta.getAttribute('name') || meta.getAttribute('property');
+      const content = meta.getAttribute('content');
+      if (name && content) meta_tags[name.toLowerCase()] = content.trim();
+    }
+
+    // Example issue
+    if (!doc.querySelector('link[rel="canonical"]')) {
+      issues.push({
+        type: 'Missing Canonical Tag',
+        description: 'No canonical tag found',
+        severity: 'medium',
+        recommendation: 'Add a canonical link',
+      });
+    }
+
+    res.status(200).json({
+      url,
+      title,
+      load_time,
+      status_code: response.status,
+      issues,
+      meta_tags,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ detail: 'Failed to analyze the URL.' });
+  }
+}

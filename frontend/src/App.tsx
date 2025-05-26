@@ -28,10 +28,10 @@ function App() {
   useEffect(() => {
     const loadCaptcha = async () => {
       try {
-        const res = await fetch('http://localhost:8000/captcha');
+        const res = await fetch('/api/captcha');
         const data = await res.json();
         setCaptchaId(data.captcha_id);
-        setCaptchaImageUrl(`http://localhost:8000${data.captcha_svg}`);
+        setCaptchaImageUrl(`/api${data.captcha_svg}`);
       } catch (err) {
         setError('Failed to load CAPTCHA');
       }
@@ -47,7 +47,7 @@ function App() {
     setResult(null);
 
     try {
-      const response = await fetch('http://localhost:8000/analyze', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,10 +64,10 @@ function App() {
         setError(errorText || 'Failed to analyze URL');
 
         // Reload CAPTCHA
-        const newCaptcha = await fetch('http://localhost:8000/captcha');
+        const newCaptcha = await fetch('/api/captcha');
         const newCaptchaData = await newCaptcha.json();
         setCaptchaId(newCaptchaData.captcha_id);
-        setCaptchaImageUrl(`http://localhost:8000${newCaptchaData.captcha_svg}`);
+        setCaptchaImageUrl(`/api${newCaptchaData.captcha_svg}`);
         return;
       }
 
@@ -88,10 +88,10 @@ function App() {
 
     // Refresh CAPTCHA
     try {
-      const res = await fetch('http://localhost:8000/captcha');
+      const res = await fetch('/api/captcha');
       const data = await res.json();
       setCaptchaId(data.captcha_id);
-      setCaptchaImageUrl(`http://localhost:8000${data.captcha_svg}`);
+      setCaptchaImageUrl(`/api${data.captcha_svg}`);
     } catch {
       setError('Failed to reload CAPTCHA');
     }

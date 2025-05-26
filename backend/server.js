@@ -9,7 +9,7 @@ import rateLimit from 'express-rate-limit';
 const app = express();
 app.use(cors());
 app.use(express.json());
-
+app.set('trust proxy', 1);
 const captchaStore = new Map();
 
 
@@ -28,10 +28,10 @@ const analyzeLimiter = rateLimit({
 });
 
 // Apply to routes
-app.use('/captcha', captchaLimiter);
-app.use('/analyze', analyzeLimiter);
+app.use('/api/captcha', captchaLimiter);
+app.use('/api/analyze', analyzeLimiter);
 
-app.get('/captcha', (req, res) => {
+app.get('/api/captcha', (req, res) => {
     const captcha = svgCaptcha.create(); // returns { data, text }
     const id = uuidv4();
   
@@ -44,20 +44,23 @@ app.get('/captcha', (req, res) => {
   
     res.json({
       captcha_id: id,
-      captcha_svg: `/captcha/image/${id}`,
+      captcha_svg: `/captcha-image?id=${id}`,
     });
   });
   
-  app.get('/captcha/image/:id', (req, res) => {
-    const captcha = captchaStore.get(req.params.id);
+  app.get('/api/captcha-image', (req, res) => {
+    const { id } = req.query;
+    const captcha = captchaStore.get(id);
+  
     if (!captcha) return res.status(404).send('Not found');
   
     res.setHeader('Content-Type', 'image/svg+xml');
     res.send(captcha.image);
   });
   
+  
 
-app.post('/analyze', async (req, res) => {
+app.post('/api/analyze', async (req, res) => {
   const { url, captcha_id, captcha_answer } = req.body;
   const storedAnswer = captchaStore.get(captcha_id);
 
