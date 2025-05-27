@@ -119,6 +119,7 @@ function App() {
               <label>Enter the text from the image:</label>
               <br />
               {captchaImageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={captchaImageUrl}
                   alt="CAPTCHA"

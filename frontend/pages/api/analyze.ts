@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-import redis from '../lib/redis'; // Adjust if needed
+import redis from '../../lib/redis'; // Adjust if needed
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,7 +18,9 @@ export default async function handler(
   if (!storedAnswer || storedAnswer !== captcha_answer?.toLowerCase()) {
     await redis.del(`captcha:${captcha_id}`);
     await redis.del(`captcha-svg:${captcha_id}`);
-    return res.status(403).json({ error: 'Invalid CAPTCHA, please try again!' });
+    return res
+      .status(403)
+      .json({ error: 'Invalid CAPTCHA, please try again!' });
   }
 
   await redis.del(`captcha:${captcha_id}`);

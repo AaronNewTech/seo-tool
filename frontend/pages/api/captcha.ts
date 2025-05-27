@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { v4 as uuidv4 } from 'uuid';
 import svgCaptcha from 'svg-captcha';
-import redis from '../lib/redis';
+import redis from '../../lib/redis';
 
 export default async function handler(
   req: NextApiRequest,
