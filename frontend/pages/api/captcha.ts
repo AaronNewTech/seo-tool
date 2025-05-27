@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { v4 as uuidv4 } from 'uuid';
+// @ts-ignore
 import svgCaptcha from 'svg-captcha';
 import redis from '../../lib/redis';
 
